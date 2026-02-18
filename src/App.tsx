@@ -54,13 +54,13 @@ export default function App() {
           {stats && (stats.djs > 0 || stats.sessions > 0) && (
             <div className="stats-row">
               <div className="stat">
-                <span className="stat-num">{stats.djs}</span>
-                <span className="stat-label">{stats.djs === 1 ? 'DJ' : 'DJs'}</span>
+                <span className="stat-num">{stats.djs}+</span>
+                <span className="stat-label">DJs</span>
               </div>
               <div className="stat-divider" />
               <div className="stat">
-                <span className="stat-num">{stats.sessions}</span>
-                <span className="stat-label">{stats.sessions === 1 ? 'Session' : 'Sessions'}</span>
+                <span className="stat-num">{stats.sessions}+</span>
+                <span className="stat-label">Sessions</span>
               </div>
             </div>
           )}
