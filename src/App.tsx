@@ -1,9 +1,18 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 
 const FAN_URL = 'https://crowdplay-app.github.io/fan/';
 const DJ_URL = 'https://crowdplay-api-i1xh.onrender.com/login';
+const API_URL = 'https://crowdplay-api-i1xh.onrender.com/api';
 
 export default function App() {
+  const [stats, setStats] = useState<{ djs: number; sessions: number } | null>(null);
+
+  useEffect(() => {
+    fetch(`${API_URL}/stats`)
+      .then(r => r.json())
+      .then(data => setStats(data))
+      .catch(() => {});
+  }, []);
   return (
     <div className="page">
       {/* Nav */}
@@ -42,6 +51,19 @@ export default function App() {
               <span>🎛️</span> DJ Dashboard
             </a>
           </div>
+          {stats && (stats.djs > 0 || stats.sessions > 0) && (
+            <div className="stats-row">
+              <div className="stat">
+                <span className="stat-num">{stats.djs}</span>
+                <span className="stat-label">{stats.djs === 1 ? 'DJ' : 'DJs'}</span>
+              </div>
+              <div className="stat-divider" />
+              <div className="stat">
+                <span className="stat-num">{stats.sessions}</span>
+                <span className="stat-label">{stats.sessions === 1 ? 'Session' : 'Sessions'}</span>
+              </div>
+            </div>
+          )}
         </div>
       </section>
 
@@ -67,7 +89,7 @@ export default function App() {
           <div className="card">
             <div className="card-icon">🎛️</div>
             <h3>DJ Controls</h3>
-            <p>DJs manage the queue with full control — play, skip, reorder, or end the set.</p>
+            <p>DJs manage the queue with full control — play, skip, reorder, or end the session.</p>
           </div>
         </div>
       </section>
@@ -79,7 +101,7 @@ export default function App() {
           <ul>
             <li>Create unlimited sessions with shareable QR codes</li>
             <li>Reorder, skip, or remove songs in real time</li>
-            <li>End a set and come back later — your queue stays</li>
+            <li>End a session and come back later — your queue stays</li>
             <li>See who requested what and how many votes it got</li>
           </ul>
           <a href={DJ_URL} className="btn btn-primary" style={{ marginTop: 16 }}>
