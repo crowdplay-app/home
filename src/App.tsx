@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 const FAN_URL = 'https://crowdplay-app.github.io/fan/';
 const DJ_URL = 'https://crowdplay-api-i1xh.onrender.com/login';
@@ -62,8 +62,26 @@ const Icon = {
   ),
 };
 
+function useFadeIn() {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) { el.classList.add('visible'); observer.unobserve(el); } },
+      { threshold: 0.15 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+  return ref;
+}
+
 export default function App() {
   const [stats, setStats] = useState<{ djs: number; sessions: number } | null>(null);
+  const heroRef = useFadeIn();
+  const featuresRef = useFadeIn();
+  const splitRef = useFadeIn();
 
   useEffect(() => {
     fetch(`${API_URL}/stats`)
@@ -89,10 +107,9 @@ export default function App() {
       </nav>
 
       {/* Hero */}
-      <section className="hero">
+      <section className="hero fade-in" ref={heroRef}>
         <div className="hero-glow" />
         <div className="hero-content">
-          <div className="badge">{Icon.music} Live DJ Queue</div>
           <h1>
             Let Your Crowd<br />
             <span className="gradient-text">Pick the Music</span>
@@ -130,7 +147,7 @@ export default function App() {
       </section>
 
       {/* How it works */}
-      <section className="features">
+      <section className="features fade-in" ref={featuresRef}>
         <h2 className="section-title">How It Works</h2>
         <div className="cards">
           <div className="card">
@@ -157,7 +174,7 @@ export default function App() {
       </section>
 
       {/* For DJs / For Fans */}
-      <section className="split">
+      <section className="split fade-in" ref={splitRef}>
         <div className="split-block">
           <h2>For <span className="gradient-text">DJs</span></h2>
           <ul>
