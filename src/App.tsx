@@ -93,37 +93,24 @@ function RotatingGlobe() {
     const cy = size / 2;
     const R = 120;
 
-    // Define great circles as tilted planes (tiltX, tiltY, tiltZ in radians)
-    // Each represents a full great circle at a unique 3D orientation
-    const circles = [
-      { tx: 0.3,  ty: 0.0,  tz: 0.1  },
-      { tx: 1.2,  ty: 0.5,  tz: 0.3  },
-      { tx: 0.6,  ty: 1.1,  tz: 0.8  },
-      { tx: 1.5,  ty: 0.3,  tz: 1.2  },
-      { tx: 0.1,  ty: 1.4,  tz: 0.5  },
-      { tx: 0.9,  ty: 0.8,  tz: 1.5  },
-      { tx: 1.3,  ty: 1.2,  tz: 0.2  },
-      { tx: 0.4,  ty: 0.6,  tz: 1.0  },
-      { tx: 1.0,  ty: 1.5,  tz: 0.7  },
-      { tx: 0.7,  ty: 0.2,  tz: 1.4  },
-    ];
+    // Distribute great circle normals evenly on a hemisphere
+    // using Fibonacci / golden-angle spacing
+    const circleCount = 10;
+    const goldenAngle = Math.PI * (3 - Math.sqrt(5)); // ~2.399 rad
+    const circleNormals: [number, number, number][] = [];
+    for (let i = 0; i < circleCount; i++) {
+      // Spread polar angle across hemisphere (0 to π/2)
+      const t = (i + 0.5) / circleCount;
+      const phi = Math.acos(1 - t); // 0 → ~π/3
+      const theta = goldenAngle * i;
+      const nx = Math.sin(phi) * Math.cos(theta);
+      const ny = Math.sin(phi) * Math.sin(theta);
+      const nz = Math.cos(phi);
+      circleNormals.push([nx, ny, nz]);
+    }
 
     let rotation = 0;
     let frame: number;
-
-    // Rotate point (x,y,z) around Y axis by angle
-    function rotY(x: number, y: number, z: number, a: number) {
-      const c = Math.cos(a), s = Math.sin(a);
-      return [c * x + s * z, y, -s * x + c * z];
-    }
-    function rotX(x: number, y: number, z: number, a: number) {
-      const c = Math.cos(a), s = Math.sin(a);
-      return [x, c * y - s * z, s * y + c * z];
-    }
-    function rotZ(x: number, y: number, z: number, a: number) {
-      const c = Math.cos(a), s = Math.sin(a);
-      return [c * x - s * y, s * x + c * y, z];
-    }
 
     function drawGlobe(rot: number) {
       ctx.clearRect(0, 0, size, size);
@@ -156,32 +143,56 @@ function RotatingGlobe() {
 
       // ── Draw great circles ──
       const steps = 120;
-      for (const circle of circles) {
+      for (const normal of circleNormals) {
+        let [nx, ny, nz] = normal;
+        // Apply global rotation around Y axis
+        const cr = Math.cos(rot), sr = Math.sin(rot);
+        const rnx = cr * nx + sr * nz;
+        const rny = ny;
+        const rnz = -sr * nx + cr * nz;
+
+        // Build two tangent vectors perpendicular to the rotated normal
+        // Pick an arbitrary vector not parallel to normal
+        let ux: number, uy: number, uz: number;
+        if (Math.abs(rnx) < 0.9) {
+          ux = 0; uy = -rnz; uz = rny; // cross(normal, (1,0,0)) simplified
+          const tmp = uy;
+          ux = rny * 0 - rnz * 0;
+          uy = rnz * 1 - rnx * 0;
+          uz = rnx * 0 - rny * 1;
+          // Actually: cross(n, (1,0,0))
+          ux = 0;
+          uy = rnz;
+          uz = -rny;
+        } else {
+          // cross(n, (0,1,0))
+          ux = -rnz;
+          uy = 0;
+          uz = rnx;
+        }
+        // Normalize u
+        const uLen = Math.sqrt(ux * ux + uy * uy + uz * uz);
+        ux /= uLen; uy /= uLen; uz /= uLen;
+        // v = cross(n, u)
+        const vx = rny * uz - rnz * uy;
+        const vy = rnz * ux - rnx * uz;
+        const vz = rnx * uy - rny * ux;
+
         ctx.strokeStyle = 'rgba(162, 106, 235, 0.55)';
         ctx.lineWidth = 1.8;
         ctx.beginPath();
-        let started = false;
         for (let i = 0; i <= steps; i++) {
           const t = (i / steps) * Math.PI * 2;
-          // Start with unit circle in XY plane
-          let px = Math.cos(t);
-          let py = Math.sin(t);
-          let pz = 0;
-          // Tilt this great circle into its unique orientation
-          [px, py, pz] = rotX(px, py, pz, circle.tx);
-          [px, py, pz] = rotZ(px, py, pz, circle.tz);
-          [px, py, pz] = rotY(px, py, pz, circle.ty);
-          // Apply global rotation (animation)
-          [px, py, pz] = rotY(px, py, pz, rot);
-          // Orthographic projection: screen x = px, screen y = py
+          const cosT = Math.cos(t);
+          const sinT = Math.sin(t);
+          // Point on the great circle
+          const px = (ux * cosT + vx * sinT);
+          const py = (uy * cosT + vy * sinT);
+          // Orthographic projection
           const sx = cx + px * R;
           const sy = cy - py * R;
-          if (!started) {
-            ctx.moveTo(sx, sy);
-            started = true;
-          } else {
-            ctx.lineTo(sx, sy);
-          }
+          if (i === 0) ctx.moveTo(sx, sy);
+          else ctx.lineTo(sx, sy);
         }
         ctx.closePath();
         ctx.stroke();
