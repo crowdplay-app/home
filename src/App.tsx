@@ -138,17 +138,26 @@ function RotatingGlobe() {
       ctx.arc(cx, cy, glowRadius, 0, Math.PI * 2);
       ctx.fill();
 
-      // ── Light rays — club lights seen from outside ──
-      // Rays start from the globe edge (not the center) and extend outward
+      // ── Light rays — randomised music visualiser style ──
+      // Rays start from the globe edge and extend outward
       const rayCount = 14;
       const rayRotation = -rot * 0.3; // anticlockwise rotation
       for (let i = 0; i < rayCount; i++) {
         const baseAngle = (i / rayCount) * Math.PI * 2 + rayRotation;
-        // Each ray has slightly different phase for organic feel
-        const rayBeat = 0.5 + 0.5 * Math.cos(beatPhase * Math.PI * 2 + i * 0.45);
-        const rayAlpha = intensity * (0.6 + 0.4 * rayBeat);
-        const rayLen = R * 0.6 + R * 0.15 * rayBeat;
-        const innerR = R * 0.75; // start rays from near the edge, no center blob
+        // Random-feeling pulse per ray using layered sine waves at irrational frequencies
+        // Each ray gets a unique combo so they never sync up
+        const seed = i * 7.31;
+        const t = now * 0.001; // time in seconds
+        const wave1 = Math.sin(t * (2.7 + seed * 0.13) + seed);
+        const wave2 = Math.sin(t * (4.1 + seed * 0.09) + seed * 2.3);
+        const wave3 = Math.sin(t * (1.3 + seed * 0.17) + seed * 0.7);
+        // Combine waves into 0→1 range, biased so rays occasionally spike
+        const combined = (wave1 + wave2 * 0.6 + wave3 * 0.4) / 2.0;
+        const rayLevel = Math.max(0, Math.min(1, 0.5 + combined * 0.5));
+        // Intensity between 50%–70% base, with random per-ray spikes to ~90%
+        const rayAlpha = 0.5 + 0.4 * rayLevel;
+        const rayLen = R * 0.5 + R * 0.3 * rayLevel;
+        const innerR = R * 0.75;
         ctx.save();
         ctx.translate(cx, cy);
         ctx.rotate(baseAngle);
@@ -159,7 +168,7 @@ function RotatingGlobe() {
         rayGrad.addColorStop(1, 'rgba(162, 106, 235, 0)');
         ctx.fillStyle = rayGrad;
         ctx.filter = 'blur(4px)';
-        const w = 5 + 3 * rayBeat;
+        const w = 4 + 4 * rayLevel;
         ctx.beginPath();
         ctx.moveTo(innerR, -w);
         ctx.lineTo(innerR + rayLen, -w * 0.3);
