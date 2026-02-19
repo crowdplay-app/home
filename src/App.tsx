@@ -78,25 +78,163 @@ function useFadeIn() {
 }
 
 function RotatingGlobe() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d')!;
+    const dpr = window.devicePixelRatio || 1;
+    const size = 200;
+    canvas.width = size * dpr;
+    canvas.height = size * dpr;
+    ctx.scale(dpr, dpr);
+    const cx = size / 2;
+    const cy = size / 2;
+    const R = 62; // globe radius
+
+    let rotation = 0;
+    let frame: number;
+
+    function drawGlobe(rot: number) {
+      ctx.clearRect(0, 0, size, size);
+
+      // ── Light rays (blurred streaks from center) ──
+      const rayCount = 12;
+      const time = rot * 0.3;
+      for (let i = 0; i < rayCount; i++) {
+        const angle = (i / rayCount) * Math.PI * 2 + time * 0.2;
+        const pulse = 0.4 + 0.3 * Math.sin(time + i * 0.8);
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(angle);
+        const rayGrad = ctx.createLinearGradient(0, 0, R + 36, 0);
+        rayGrad.addColorStop(0, `rgba(162, 106, 235, ${0.35 * pulse})`);
+        rayGrad.addColorStop(0.5, `rgba(162, 106, 235, ${0.15 * pulse})`);
+        rayGrad.addColorStop(1, 'rgba(162, 106, 235, 0)');
+        ctx.fillStyle = rayGrad;
+        ctx.filter = 'blur(6px)';
+        ctx.beginPath();
+        ctx.moveTo(0, -4);
+        ctx.lineTo(R + 36, -2 - 3 * pulse);
+        ctx.lineTo(R + 36, 2 + 3 * pulse);
+        ctx.lineTo(0, 4);
+        ctx.closePath();
+        ctx.fill();
+        ctx.filter = 'none';
+        ctx.restore();
+      }
+
+      // ── Outer glow ──
+      const outerGlow = ctx.createRadialGradient(cx, cy, R * 0.8, cx, cy, R * 1.5);
+      outerGlow.addColorStop(0, 'rgba(162, 106, 235, 0.12)');
+      outerGlow.addColorStop(1, 'rgba(162, 106, 235, 0)');
+      ctx.fillStyle = outerGlow;
+      ctx.beginPath();
+      ctx.arc(cx, cy, R * 1.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      // ── Globe base sphere gradient ──
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(cx, cy, R, 0, Math.PI * 2);
+      ctx.closePath();
+      ctx.clip();
+
+      // Main sphere gradient
+      const sphereGrad = ctx.createRadialGradient(cx - R * 0.3, cy - R * 0.3, R * 0.05, cx, cy, R);
+      sphereGrad.addColorStop(0, '#d4b0ff');
+      sphereGrad.addColorStop(0.3, '#a26aeb');
+      sphereGrad.addColorStop(0.7, '#7b3ec4');
+      sphereGrad.addColorStop(1, '#3a1070');
+      ctx.fillStyle = sphereGrad;
+      ctx.fillRect(cx - R, cy - R, R * 2, R * 2);
+
+      // ── Grid lines (latitude) ──
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+      ctx.lineWidth = 0.8;
+      const latitudes = [-45, -20, 0, 20, 45];
+      for (const lat of latitudes) {
+        const latRad = (lat * Math.PI) / 180;
+        const y = cy - R * Math.sin(latRad);
+        const rAtLat = R * Math.cos(latRad);
+        const squeeze = 0.25;
+        ctx.beginPath();
+        ctx.ellipse(cx, y, rAtLat, rAtLat * squeeze, 0, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      // ── Grid lines (longitude) ── rotating ──
+      const lonCount = 8;
+      for (let i = 0; i < lonCount; i++) {
+        const lon = ((i / lonCount) * Math.PI) + rot;
+        const xScale = Math.cos(lon);
+        // Only draw if facing us (visible half)
+        ctx.strokeStyle = `rgba(255, 255, 255, ${0.06 + 0.08 * Math.abs(Math.sin(lon))})`;
+        ctx.lineWidth = 0.8;
+        ctx.beginPath();
+        for (let a = -Math.PI / 2; a <= Math.PI / 2; a += 0.05) {
+          const px = cx + R * xScale * Math.cos(a) * Math.sin(a === -Math.PI / 2 ? 0 : 1);
+          const py = cy - R * Math.sin(a);
+          // Project longitude arc onto sphere
+          const projX = cx + R * Math.cos(a) * Math.sin(lon);
+          const projY = cy - R * Math.sin(a);
+          if (a === -Math.PI / 2) {
+            ctx.moveTo(projX, projY);
+          } else {
+            ctx.lineTo(projX, projY);
+          }
+        }
+        ctx.stroke();
+      }
+
+      // ── Specular highlight ──
+      const specGrad = ctx.createRadialGradient(cx - R * 0.3, cy - R * 0.32, 0, cx - R * 0.3, cy - R * 0.32, R * 0.55);
+      specGrad.addColorStop(0, 'rgba(255, 255, 255, 0.3)');
+      specGrad.addColorStop(0.5, 'rgba(255, 255, 255, 0.06)');
+      specGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+      ctx.fillStyle = specGrad;
+      ctx.beginPath();
+      ctx.arc(cx, cy, R, 0, Math.PI * 2);
+      ctx.fill();
+
+      // ── Rim light (bottom-right edge) ──
+      const rimGrad = ctx.createRadialGradient(cx + R * 0.4, cy + R * 0.4, R * 0.6, cx + R * 0.4, cy + R * 0.4, R);
+      rimGrad.addColorStop(0, 'rgba(162, 106, 235, 0)');
+      rimGrad.addColorStop(0.8, 'rgba(162, 106, 235, 0.08)');
+      rimGrad.addColorStop(1, 'rgba(200, 160, 255, 0.2)');
+      ctx.fillStyle = rimGrad;
+      ctx.beginPath();
+      ctx.arc(cx, cy, R, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore();
+
+      // ── Sphere outline ──
+      ctx.strokeStyle = 'rgba(162, 106, 235, 0.3)';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.arc(cx, cy, R, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    function animate() {
+      rotation += 0.012;
+      drawGlobe(rotation);
+      frame = requestAnimationFrame(animate);
+    }
+    animate();
+
+    return () => cancelAnimationFrame(frame);
+  }, []);
+
   return (
     <div className="globe-wrapper">
-      {/* Blurred light rays */}
-      <div className="globe-rays" />
-      {/* Globe */}
-      <div className="globe">
-        <div className="globe-sphere">
-          {/* Latitude lines */}
-          <div className="globe-line globe-lat globe-lat-1" />
-          <div className="globe-line globe-lat globe-lat-2" />
-          <div className="globe-line globe-lat globe-lat-3" />
-          {/* Longitude lines (rotating) */}
-          <div className="globe-line globe-lon globe-lon-1" />
-          <div className="globe-line globe-lon globe-lon-2" />
-          <div className="globe-line globe-lon globe-lon-3" />
-          {/* Highlight / shine */}
-          <div className="globe-highlight" />
-        </div>
-      </div>
+      <canvas
+        ref={canvasRef}
+        className="globe-canvas"
+        style={{ width: 200, height: 200 }}
+      />
     </div>
   );
 }
